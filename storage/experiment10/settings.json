@@ -2,6 +2,7 @@
     "NUM_REALIZATIONS": 1000,
     "NUM_OBSERVATIONS": 101,
     "true_sigma": 0.3333333333333333,
+    "model_sigma": 0.25,
     "scale_kw": 2,
     "ka": 2,
     "NUM_WARPING_TERMS": 10,
@@ -10,6 +11,5 @@
     "ald_threshold": 0.1,
     "x0": -3.141592653589793,
     "kw": 0.12441951103325913,
-    "model_sigma": 0.1,
     "dictionary_size": 68
 }

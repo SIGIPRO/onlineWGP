@@ -64,6 +64,8 @@ def experiment10():
         "NUM_REALIZATIONS": 1000,
         "NUM_OBSERVATIONS": 101,
         "true_sigma": 1/3,
+        # "model_sigma": 0.1,
+        "model_sigma": (3/4) * (1/3),
         "scale_kw": 2,
         "ka": 2,
         "NUM_WARPING_TERMS": 10,
@@ -79,8 +81,7 @@ def experiment10():
     ka = conf['ka']
     kernel_function = GaussianKernelFunction(kernel_width=kw,kernel_amplitude=ka)
     ## noise 
-    model_sigma = 0.1
-    conf['model_sigma'] = model_sigma
+    model_sigma = conf['model_sigma'] 
     ## warping 
     warping = WarpingFunction(n=conf['NUM_WARPING_TERMS'],learning_rate=conf['lr'])
     warping.idle_warping = conf['idle_warping']
@@ -133,6 +134,7 @@ def experiment20():
         "NUM_REALIZATIONS": 1000,
         "NUM_OBSERVATIONS": 101,
         "true_sigma": 1/3,
+        "model_sigma": 3,
         "scale_kw": 2,
         "ka": 2,
         "NUM_WARPING_TERMS": 10,
@@ -148,8 +150,7 @@ def experiment20():
     ka = conf['ka']
     kernel_function = GaussianKernelFunction(kernel_width=kw,kernel_amplitude=ka)
     ## noise 
-    model_sigma = 3
-    conf['model_sigma'] = model_sigma
+    model_sigma = conf['model_sigma'] 
     ## warping 
     warping = WarpingFunction(n=conf['NUM_WARPING_TERMS'],learning_rate=conf['lr'])
     warping.idle_warping = conf['idle_warping']
@@ -431,6 +432,66 @@ def experiment41():
         spine.set_linewidth(1.5)
     plt.tight_layout()
     plt.show()
+
+def experiment50():
+    ''' compare negative log-likelihood (NLL) of standard GP and warped GP '''
+    # load trained models and associated configurations
+    model_gp, conf_gp = load_experiment('experiment10')
+    model_wgp, conf_wgp = load_experiment('experiment20')
+    
+    # setup evaluation grid and test dataset settings
+    NUM_EVAL = 401
+    NUM_EVAL_REALIZATIONS = 100
+    x_eval = np.linspace(-np.pi, np.pi, NUM_EVAL)
+
+    # pre-compute latent predictions across grid
+    gp_means = np.array([model_gp.compute_mean(xi) for xi in x_eval])
+    gp_stds = np.sqrt(np.array([model_gp.compute_variance(xi) for xi in x_eval]) + conf_gp['model_sigma']**2)
+    
+    wgp_means = np.array([model_wgp.compute_mean(xi) for xi in x_eval])
+    wgp_stds = np.sqrt(np.array([model_wgp.compute_variance(xi) for xi in x_eval]) + conf_wgp['model_sigma']**2)
+    
+    nll_gp_list = []
+    nll_wgp_list = []
+    
+    # evaluate NLL over multiple realizations of test data
+    for _ in range(NUM_EVAL_REALIZATIONS):
+        # generate target test output y = cbrt( sin(x) + noise )
+        y_eval = np.cbrt(np.sin(x_eval) + np.random.normal(0, conf_gp['true_sigma'], size=NUM_EVAL))
+        
+        ## standard GP NLL 
+        ## NLL = 0.5 * log(2*pi*sigma^2) + (y - mu)^2 / (2*sigma^2)
+        nll_gp = 0.5 * np.log(2 * np.pi * (gp_stds**2)) + ((y_eval - gp_means)**2) / (2 * (gp_stds**2))
+        nll_gp_list.extend(nll_gp)
+        
+        ## warped GP NLL
+        ## map target y into latent domain: z = g(y)
+        z_eval = model_wgp.warping.transform(y_eval)
+        
+        ## exact gradient of warping function wrt y: dg/dy = g'(y)
+        dg_dy = np.abs(model_wgp.warping._dg_dy(y_eval))
+        
+        ## latent NLL adjusted with the log-Jacobian term: -log p(y) = -log q(g(y)) - log|g'(y)|
+        nll_wgp = (0.5 * np.log(2 * np.pi * (wgp_stds**2)) + 
+                   ((z_eval - wgp_means)**2) / (2 * (wgp_stds**2)) - 
+                   np.log(dg_dy + 1e-12))
+        nll_wgp_list.extend(nll_wgp)
+    
+    # summary metrics
+    mean_nll_gp = np.mean(nll_gp_list)
+    mean_nll_wgp = np.mean(nll_wgp_list)
+    
+    print("==================================================")
+    print("           MODEL EVALUATION RESULTS (NLL)         ")
+    print("==================================================")
+    print(f"Standard GP Mean NLL : {mean_nll_gp:.4f}")
+    print(f"Warped GP Mean NLL   : {mean_nll_wgp:.4f}")
+    print("--------------------------------------------------")
+    if mean_nll_wgp < mean_nll_gp:
+        print(f"Warped GP achieves a superior fit by {mean_nll_gp - mean_nll_wgp:.4f} nats per observation.")
+    else:
+        print(f"Standard GP outperforms Warped GP by {mean_nll_gp - mean_nll_wgp:.4f} nats per observation.")
+    print("==================================================")
 
 
 """ MAIN """

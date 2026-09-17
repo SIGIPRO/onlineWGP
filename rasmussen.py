@@ -50,7 +50,7 @@ L_post = np.linalg.cholesky(Cov_post + jitter * np.eye(n_test))
 f_post_samples = mu_post.reshape(-1, 1) + np.dot(L_post, np.random.normal(size=(n_test, 3)))
 
 # PLOTS
-fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 8))
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 5))
 ## prior
 ### 95% confidence interval (1.96 standard deviations)
 ax1.fill_between(X_test.flatten(), mu_prior - 1.96*std_prior, mu_prior + 1.96*std_prior, 
